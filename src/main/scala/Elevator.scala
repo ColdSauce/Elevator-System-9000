@@ -1,9 +1,7 @@
 /**
   * Created by campi on 10/25/2016.
   */
-class Elevator(currentFloor: Int) {
+case class ElevatorState(currentFloor: Int, goalNumber: Int)
+case class Elevator(elevatorState: ElevatorState) {
 
-  def status: (Int, Int) = {
-
-  }
 }
