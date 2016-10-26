@@ -1,13 +1,14 @@
 import ElevatorSystem.ElevatorMalfunctionError
+import cats.data.Xor
 
 /**
   * Created by campi on 10/25/2016.
   */
-class ElevatorSystem(elevators: Vector[Elevator], listeners: Vector[(Elevator, Int, Int) => Either[ElevatorMalfunctionError, Unit]]) {
+class ElevatorSystem(elevators: Vector[Elevator], listeners: Vector[(Elevator) => Unit]) {
 
 
-  def getAllStatus: Vector[(Elevator, Int, Int)] = {
-    elevators.map(elevator => (elevator, elevator.elevatorState.currentFloor, elevator.elevatorState.goalNumber))
+  def getAllStatus: Vector[Elevator] = {
+    elevators
   }
 
   def createPickup(floorNumber: Int): Elevator = {
@@ -15,33 +16,37 @@ class ElevatorSystem(elevators: Vector[Elevator], listeners: Vector[(Elevator, I
       Util.nearer(acc, curr, floorNumber)
     })
 
-    Elevator(ElevatorState(elevatorToUse.elevatorState.currentFloor, floorNumber))
+    Elevator(elevatorToUse.elevatorId, ElevatorState(elevatorToUse.elevatorState.currentFloor,
+      elevatorToUse.elevatorState.goalNumbers :+ (floorNumber), elevatorToUse.elevatorState.isGoingUp))
   }
 
 
-  def update(elevator: Elevator, currentFloor: Int, goalNumber: Int): Unit = {// Either[ElevatorMalfunctionError, Unit] = {
-    listeners.foreach(_(elevator, currentFloor, goalNumber))
-//    listeners.reduce[(Elevator, Int, Int) => Either[ElevatorMalfunctionError, Unit]]((acc, curr) => {
-//      for {
-//        acc <- acc
-//        curr <- curr
-//      } yield {
-//        (curr(elevator, currentFloor, goalNumber))
-//      }
-//    }
+  def update(elevator: Elevator): Unit = {
+    listeners.foreach(listener => listener(elevator))
   }
 
-
-
-
-
+  def step: ElevatorSystem = {
+    val newElevators = elevators.map(_.step)
+    newElevators.foreach(elevator => update(elevator))
+    new ElevatorSystem(newElevators, listeners)
+  }
 
 }
 
 object ElevatorSystem {
   trait ElevatorMalfunctionError
   case object OutOfFuelError
-  def createFromElevators(elevators: Vector[Elevator], listeners: Vector[(Elevator, Int, Int) => Either[ElevatorMalfunctionError, Unit]]): ElevatorSystem = {
-    return new ElevatorSystem(elevators, listeners)
+
+  trait ElevatorSystemCreationError
+  case object TooManyElevatorsError extends ElevatorSystemCreationError
+
+  def createFromElevators(elevators: Vector[Elevator],
+                          listeners: Vector[(Elevator) => Unit]):
+                          Xor[ElevatorSystemCreationError, ElevatorSystem] = {
+    if(elevators.length > 16) {
+      Xor.left(TooManyElevatorsError)
+    } else {
+      Xor.right(new ElevatorSystem(elevators, listeners))
+    }
   }
 }
